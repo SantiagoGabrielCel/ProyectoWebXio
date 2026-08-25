@@ -6,3 +6,7 @@ services:
     buildCommand: ""
     staticPublishPath: .
     autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /
+        destination: /placeholder-checkout-colores-liderlib-v7.html
