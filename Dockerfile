@@ -7,7 +7,7 @@ RUN npm install --omit=dev
 
 COPY index.html admin.html modern-ui.css ./
 COPY server ./server
-COPY "Imagenes de Productos" "./Imagenes de Productos"
+COPY ["Imagenes de Productos", "./Imagenes de Productos"]
 
 RUN mkdir -p datos uploads/products
 
