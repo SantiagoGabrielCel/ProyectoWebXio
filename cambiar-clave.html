@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LiderLib | Cambiar contraseña</title>
+<link rel="stylesheet" href="modern-ui.css">
+<style>
+  :root{--bg:#f5f7fb;--ink:#172033;--muted:#667085;--line:#e4e8f0;--primary:#3157E8;--danger:#dc2626}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  .wrap{width:min(calc(100% - 40px),420px);margin:auto;padding:60px 0}
+  h1{font-size:1.5rem;letter-spacing:-.03em;margin:0 0 6px}
+  p.sub{color:var(--muted);margin:0 0 28px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.05)}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .field span{font-size:.8rem;font-weight:800;color:var(--muted)}
+  .field input{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit}
+  button{cursor:pointer;font:inherit}
+  .btn-primary{border:0;background:var(--primary);color:#fff;font-weight:800;height:44px;border-radius:10px;padding:0 18px;width:100%}
+  .btn-primary:disabled{opacity:.6;cursor:not-allowed}
+  .back-link{display:inline-block;margin-bottom:18px;color:var(--muted);font-weight:800;font-size:.85rem;text-decoration:none}
+  .msg{min-height:20px;font-size:.85rem;font-weight:700;margin-top:8px}
+  .msg.error{color:var(--danger)}
+  .msg.ok{color:#16a34a}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="admin.html">← Volver al panel</a>
+  <h1>Cambiar contraseña</h1>
+  <p class="sub">Actualizá la clave del usuario admin.</p>
+
+  <div class="card">
+    <form id="changePasswordForm">
+      <label class="field">
+        <span>Clave actual</span>
+        <input type="password" id="currentPassword" autocomplete="current-password" required>
+      </label>
+      <label class="field">
+        <span>Clave nueva (mínimo 8 caracteres)</span>
+        <input type="password" id="newPassword" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label class="field">
+        <span>Repetir clave nueva</span>
+        <input type="password" id="newPasswordConfirm" autocomplete="new-password" minlength="8" required>
+      </label>
+      <button class="btn-primary" type="submit">Actualizar contraseña</button>
+      <div class="msg" id="changePasswordMsg"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('liderlib_admin_token');
+if (!token) {
+  window.location.href = 'admin.html';
+}
+
+document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('changePasswordMsg');
+  msg.className = 'msg';
+  msg.textContent = '';
+  const claveActual = document.getElementById('currentPassword').value;
+  const claveNueva = document.getElementById('newPassword').value;
+  const claveNuevaConfirm = document.getElementById('newPasswordConfirm').value;
+
+  if (claveNueva !== claveNuevaConfirm) {
+    msg.classList.add('error');
+    msg.textContent = 'Las claves nuevas no coinciden.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/cambiar-clave', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ claveActual, claveNueva })
+    });
+    const data = await res.json();
+    if (res.status === 401 && data.error === 'Sesión inválida o expirada') {
+      localStorage.removeItem('liderlib_admin_token');
+      localStorage.removeItem('liderlib_admin_user');
+      window.location.href = 'admin.html';
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'No se pudo actualizar la contraseña');
+    msg.classList.add('ok');
+    msg.textContent = 'Contraseña actualizada. Volviendo al panel...';
+    e.target.reset();
+    setTimeout(() => { window.location.href = 'admin.html'; }, 1200);
+  } catch (err) {
+    msg.classList.add('error');
+    msg.textContent = err.message;
+  }
+});
+</script>
+</body>
+</html>

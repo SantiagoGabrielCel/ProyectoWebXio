@@ -37,6 +37,10 @@
   .product-info span{font-size:.78rem;color:var(--muted)}
   .product-actions{display:flex;align-items:center;gap:8px}
   .product-actions input[type=file]{max-width:180px;font-size:.78rem}
+  .price-form{display:flex;align-items:center;gap:8px}
+  .price-form input[type=number]{width:110px;height:38px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit}
+  .price-form label{display:flex;flex-direction:column;gap:4px;font-size:.68rem;font-weight:800;color:var(--muted);text-transform:uppercase}
+  .product-row-actions{display:flex;flex-direction:column;gap:10px;align-items:flex-end}
   section.section{margin-top:32px}
   section.section h2{font-size:1.2rem;margin:0 0 14px}
 </style>
@@ -65,7 +69,10 @@
   <div id="panelView">
     <div class="top-bar">
       <strong id="welcomeMsg"></strong>
-      <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+      <div style="display:flex;gap:10px">
+        <button class="logout-btn" id="changePasswordBtn">Cambiar contraseña</button>
+        <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+      </div>
     </div>
 
     <section class="section">
@@ -106,28 +113,6 @@
       <h2>Productos existentes</h2>
       <div class="msg" id="productsMsg"></div>
       <div class="product-list" id="productList"></div>
-    </section>
-
-    <section class="section">
-      <h2>Cambiar contraseña</h2>
-      <div class="card">
-        <form id="changePasswordForm">
-          <label class="field">
-            <span>Clave actual</span>
-            <input type="password" id="currentPassword" autocomplete="current-password" required>
-          </label>
-          <label class="field">
-            <span>Clave nueva (mínimo 8 caracteres)</span>
-            <input type="password" id="newPassword" autocomplete="new-password" minlength="8" required>
-          </label>
-          <label class="field">
-            <span>Repetir clave nueva</span>
-            <input type="password" id="newPasswordConfirm" autocomplete="new-password" minlength="8" required>
-          </label>
-          <button class="btn-primary" type="submit">Actualizar contraseña</button>
-          <div class="msg" id="changePasswordMsg"></div>
-        </form>
-      </div>
     </section>
   </div>
 </div>
@@ -195,6 +180,10 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   showLogin();
 });
 
+document.getElementById('changePasswordBtn').addEventListener('click', () => {
+  window.location.href = 'cambiar-clave.html';
+});
+
 document.getElementById('newProductForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('newProductMsg');
@@ -236,6 +225,7 @@ async function loadProducts() {
     const products = await res.json();
     msg.textContent = '';
     list.innerHTML = products.map(renderProductRow).join('');
+    products.forEach(bindPriceForm);
     products.forEach(bindImageForm);
   } catch (err) {
     msg.classList.add('error');
@@ -254,13 +244,52 @@ function renderProductRow(p) {
         <b>#${p.id} · ${p.nombre}</b>
         <span>${p.categoria} · Minorista $${p.precio_minorista} · Mayorista $${p.precio_mayorista}</span>
       </div>
-      <form class="product-actions image-form" data-id="${p.id}">
-        <input type="file" name="imagen" accept="image/png,image/jpeg,image/webp,image/gif" required>
-        <button class="btn-primary" type="submit">Actualizar imagen</button>
-      </form>
+      <div class="product-row-actions">
+        <form class="price-form" data-id="${p.id}">
+          <label>Minorista
+            <input type="number" name="precio_minorista" min="1" step="1" value="${p.precio_minorista}" required>
+          </label>
+          <label>Mayorista
+            <input type="number" name="precio_mayorista" min="1" step="1" value="${p.precio_mayorista}" required>
+          </label>
+          <button class="btn-primary" type="submit">Guardar precios</button>
+        </form>
+        <form class="product-actions image-form" data-id="${p.id}">
+          <input type="file" name="imagen" accept="image/png,image/jpeg,image/webp,image/gif" required>
+          <button class="btn-primary" type="submit">Actualizar imagen</button>
+        </form>
+      </div>
     </div>
+    <div class="msg" data-price-msg="${p.id}"></div>
     <div class="msg" data-image-msg="${p.id}"></div>
   `;
+}
+
+function bindPriceForm(p) {
+  const form = document.querySelector(`.price-form[data-id="${p.id}"]`);
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.querySelector(`[data-price-msg="${p.id}"]`);
+    msg.className = 'msg';
+    const precio_minorista = form.precio_minorista.value;
+    const precio_mayorista = form.precio_mayorista.value;
+    try {
+      const res = await authFetch(`/api/admin/products/${p.id}/precios`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ precio_minorista, precio_mayorista })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudieron actualizar los precios');
+      msg.classList.add('ok');
+      msg.textContent = 'Precios actualizados.';
+      loadProducts();
+    } catch (err) {
+      msg.classList.add('error');
+      msg.textContent = err.message;
+    }
+  });
 }
 
 function bindImageForm(p) {
@@ -290,38 +319,6 @@ function bindImageForm(p) {
     }
   });
 }
-
-document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const msg = document.getElementById('changePasswordMsg');
-  msg.className = 'msg';
-  msg.textContent = '';
-  const claveActual = document.getElementById('currentPassword').value;
-  const claveNueva = document.getElementById('newPassword').value;
-  const claveNuevaConfirm = document.getElementById('newPasswordConfirm').value;
-
-  if (claveNueva !== claveNuevaConfirm) {
-    msg.classList.add('error');
-    msg.textContent = 'Las claves nuevas no coinciden.';
-    return;
-  }
-
-  try {
-    const res = await authFetch('/api/admin/cambiar-clave', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ claveActual, claveNueva })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'No se pudo actualizar la contraseña');
-    msg.classList.add('ok');
-    msg.textContent = 'Contraseña actualizada.';
-    e.target.reset();
-  } catch (err) {
-    msg.classList.add('error');
-    msg.textContent = err.message;
-  }
-});
 
 if (token) {
   showPanel(localStorage.getItem('liderlib_admin_user') || 'admin');

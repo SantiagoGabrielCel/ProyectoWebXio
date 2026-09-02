@@ -13,6 +13,7 @@ const {
   spCambiarClave,
   spAltaProducto,
   spActualizarImagen,
+  spActualizarPrecios,
   getAllProducts,
   getProductById,
   nextProductId
@@ -92,6 +93,21 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
     bulk_qty: Number(cantidad_minima_mayorista) || 10
   });
   res.status(201).json(product);
+});
+
+app.put('/api/admin/products/:id/precios', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const { precio_minorista, precio_mayorista } = req.body || {};
+  const minorista = Number(precio_minorista);
+  const mayorista = Number(precio_mayorista);
+
+  if (!Number.isFinite(minorista) || minorista <= 0 || !Number.isFinite(mayorista) || mayorista <= 0) {
+    return res.status(400).json({ error: 'Los precios deben ser números mayores a 0' });
+  }
+
+  const actualizado = spActualizarPrecios(id, minorista, mayorista);
+  if (!actualizado) return res.status(404).json({ error: 'Producto no encontrado' });
+  res.json(getProductById(id));
 });
 
 const upload = multer({

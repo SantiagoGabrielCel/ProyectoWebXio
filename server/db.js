@@ -196,6 +196,14 @@ function spActualizarImagen(id, rutaImagen) {
   return result.changes > 0;
 }
 
+// sp_actualizar_precios: actualiza el precio minorista y mayorista de un producto existente.
+function spActualizarPrecios(id, precioMinorista, precioMayorista) {
+  const result = db.prepare(
+    'UPDATE productos SET precio_minorista = ?, precio_mayorista = ? WHERE id = ?'
+  ).run(precioMinorista, precioMayorista, id);
+  return result.changes > 0;
+}
+
 function getAllProducts() {
   return db.prepare('SELECT * FROM productos ORDER BY id').all();
 }
@@ -214,6 +222,7 @@ module.exports = {
   spCambiarClave,
   spAltaProducto,
   spActualizarImagen,
+  spActualizarPrecios,
   getAllProducts,
   getProductById,
   nextProductId
