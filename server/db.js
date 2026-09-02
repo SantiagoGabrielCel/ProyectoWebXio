@@ -128,11 +128,29 @@ function sincronizarImagenesSemilla() {
   }
 }
 
+// Usuario/clave de admin configurables por entorno (ADMIN_USERNAME/ADMIN_PASSWORD).
+// Si ADMIN_PASSWORD está definida, siempre se aplica (sirve para resetear el
+// acceso). Si no, solo se usa una clave por defecto la primera vez: una vez
+// creado el usuario, su clave se puede cambiar desde el panel admin sin que
+// se pise en cada reinicio.
 function seedAdmin() {
-  const existing = db.prepare('SELECT id FROM usuarios_admin WHERE usuario = ?').get('Amadeo');
-  if (existing) return;
-  const hash = bcrypt.hashSync('AmadeoLiderLib', 10);
-  db.prepare('INSERT INTO usuarios_admin (usuario, clave_hash) VALUES (?, ?)').run('Amadeo', hash);
+  const usuario = process.env.ADMIN_USERNAME || 'Amadeo';
+  const claveEntorno = process.env.ADMIN_PASSWORD;
+  const existente = db.prepare('SELECT id FROM usuarios_admin WHERE usuario = ?').get(usuario);
+
+  if (!existente) {
+    if (!claveEntorno) {
+      console.warn('[LiderLib] ADMIN_PASSWORD no definida: usando clave por defecto (solo desarrollo). Cambiala desde el panel admin.');
+    }
+    const hash = bcrypt.hashSync(claveEntorno || 'AmadeoLiderLib', 10);
+    db.prepare('INSERT INTO usuarios_admin (usuario, clave_hash) VALUES (?, ?)').run(usuario, hash);
+    return;
+  }
+
+  if (claveEntorno) {
+    const hash = bcrypt.hashSync(claveEntorno, 10);
+    db.prepare('UPDATE usuarios_admin SET clave_hash = ? WHERE usuario = ?').run(hash, usuario);
+  }
 }
 
 seedProducts();
@@ -145,6 +163,16 @@ function spVerificarAdmin(username, password) {
   const row = db.prepare('SELECT clave_hash FROM usuarios_admin WHERE usuario = ?').get(username);
   if (!row) return false;
   return bcrypt.compareSync(password, row.clave_hash);
+}
+
+// sp_cambiar_clave: permite al admin cambiar su propia clave (valida la actual antes de guardar el hash nuevo).
+function spCambiarClave(usuario, claveActual, claveNueva) {
+  const row = db.prepare('SELECT clave_hash FROM usuarios_admin WHERE usuario = ?').get(usuario);
+  if (!row) return false;
+  if (!bcrypt.compareSync(claveActual, row.clave_hash)) return false;
+  const hash = bcrypt.hashSync(claveNueva, 10);
+  db.prepare('UPDATE usuarios_admin SET clave_hash = ? WHERE usuario = ?').run(hash, usuario);
+  return true;
 }
 
 // sp_alta_producto: crea un producto nuevo o actualiza uno existente (mismo id).
@@ -183,6 +211,7 @@ function nextProductId() {
 
 module.exports = {
   spVerificarAdmin,
+  spCambiarClave,
   spAltaProducto,
   spActualizarImagen,
   getAllProducts,

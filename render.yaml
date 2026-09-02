@@ -8,6 +8,13 @@ services:
     envVars:
       - key: JWT_SECRET
         generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+# Nota: ADMIN_USERNAME y ADMIN_PASSWORD hay que cargarlos a mano desde el
+# dashboard de Render (Environment) la primera vez; no se generan solos
+# porque necesitás conocer la clave para poder iniciar sesión en /admin.html.
 # Nota: el plan "free" no soporta discos persistentes, por lo que la base
 # SQLite y las imágenes subidas se reinician en cada deploy. Para persistir
 # los datos entre deploys, subir de plan y agregar un bloque "disk" montado

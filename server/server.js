@@ -6,9 +6,11 @@ const crypto = require('crypto');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 
 const {
   spVerificarAdmin,
+  spCambiarClave,
   spAltaProducto,
   spActualizarImagen,
   getAllProducts,
@@ -25,6 +27,7 @@ const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('he
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // --- Autenticación ---
@@ -40,13 +43,32 @@ function requireAdmin(req, res, next) {
   }
 }
 
-app.post('/api/admin/login', (req, res) => {
+// Frena intentos de fuerza bruta contra el login y el cambio de clave del admin.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Probá de nuevo en unos minutos.' }
+});
+
+app.post('/api/admin/login', loginLimiter, (req, res) => {
   const { usuario, clave } = req.body || {};
   if (!spVerificarAdmin(usuario, clave)) {
     return res.status(401).json({ error: 'Usuario o clave incorrectos' });
   }
   const token = jwt.sign({ usuario }, JWT_SECRET, { expiresIn: '8h' });
   res.json({ token });
+});
+
+app.post('/api/admin/cambiar-clave', loginLimiter, requireAdmin, (req, res) => {
+  const { claveActual, claveNueva } = req.body || {};
+  if (!claveActual || !claveNueva || String(claveNueva).length < 8) {
+    return res.status(400).json({ error: 'La nueva clave debe tener al menos 8 caracteres' });
+  }
+  const ok = spCambiarClave(req.admin.usuario, claveActual, claveNueva);
+  if (!ok) return res.status(401).json({ error: 'La clave actual no es correcta' });
+  res.json({ ok: true });
 });
 
 // --- Productos (público: solo lectura) ---
