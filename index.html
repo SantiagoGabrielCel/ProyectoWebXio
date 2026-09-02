@@ -3928,6 +3928,21 @@ function filterProducts() {
 q.oninput = filterProducts;
 
 renderCart();
+
+// Carga las imágenes de producto guardadas desde el panel de administración.
+fetch('/api/products')
+  .then(res => res.ok ? res.json() : [])
+  .then(list => {
+    list.forEach(p => {
+      if (!p.ruta_imagen) return;
+      const card = document.querySelector(`.card[data-id="${p.id}"]`);
+      if (!card) return;
+      const media = card.querySelector('.media');
+      if (!media) return;
+      media.innerHTML = `<img src="${p.ruta_imagen}" alt="${p.nombre}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
+    });
+  })
+  .catch(() => {});
 </script>
 </body>
 </html>

@@ -1,12 +1,14 @@
 services:
   - type: web
     name: proyectowebxio
-    runtime: static
+    runtime: docker
     plan: free
-    buildCommand: ""
-    staticPublishPath: .
+    dockerfilePath: ./Dockerfile
     autoDeploy: true
-    routes:
-      - type: rewrite
-        source: /
-        destination: /placeholder-checkout-colores-liderlib-v7.html
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+# Nota: el plan "free" no soporta discos persistentes, por lo que la base
+# SQLite y las imágenes subidas se reinician en cada deploy. Para persistir
+# los datos entre deploys, subir de plan y agregar un bloque "disk" montado
+# en /app/datos (y mover uploads/products ahí también).

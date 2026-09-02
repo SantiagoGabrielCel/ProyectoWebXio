@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LiderLib | Panel de administración</title>
+<link rel="stylesheet" href="modern-ui.css">
+<style>
+  :root{--bg:#f5f7fb;--ink:#172033;--muted:#667085;--line:#e4e8f0;--primary:#3157E8;--danger:#dc2626}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+  .wrap{width:min(calc(100% - 40px),1000px);margin:auto;padding:40px 0}
+  h1{font-size:1.8rem;letter-spacing:-.03em;margin:0 0 6px}
+  p.sub{color:var(--muted);margin:0 0 28px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.05)}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .field span{font-size:.8rem;font-weight:800;color:var(--muted)}
+  .field input,.field select{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit}
+  .row{display:flex;gap:12px}
+  .row>.field{flex:1}
+  button{cursor:pointer;font:inherit}
+  .btn-primary{border:0;background:var(--primary);color:#fff;font-weight:800;height:44px;border-radius:10px;padding:0 18px}
+  .btn-primary:disabled{opacity:.6;cursor:not-allowed}
+  .msg{min-height:20px;font-size:.85rem;font-weight:700;margin-top:8px}
+  .msg.error{color:var(--danger)}
+  .msg.ok{color:#16a34a}
+  #loginView{max-width:380px;margin:60px auto}
+  #panelView{display:none}
+  .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+  .logout-btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;font-weight:800}
+  .product-list{margin-top:24px;display:flex;flex-direction:column;gap:12px}
+  .product-row{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .product-thumb{width:64px;height:64px;border-radius:10px;background:#eef3f9;display:grid;place-items:center;overflow:hidden;flex:0 0 auto;font-size:.65rem;color:#8a93a6;text-align:center;font-weight:800}
+  .product-thumb img{width:100%;height:100%;object-fit:cover}
+  .product-info{flex:1;min-width:0}
+  .product-info b{display:block;font-size:.95rem}
+  .product-info span{font-size:.78rem;color:var(--muted)}
+  .product-actions{display:flex;align-items:center;gap:8px}
+  .product-actions input[type=file]{max-width:180px;font-size:.78rem}
+  section.section{margin-top:32px}
+  section.section h2{font-size:1.2rem;margin:0 0 14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LiderLib · Panel de administración</h1>
+  <p class="sub">Gestión de productos e imágenes.</p>
+
+  <div id="loginView" class="card">
+    <h2 style="margin-top:0">Iniciar sesión</h2>
+    <form id="loginForm">
+      <label class="field">
+        <span>Usuario</span>
+        <input type="text" id="loginUser" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Clave</span>
+        <input type="password" id="loginPass" autocomplete="current-password" required>
+      </label>
+      <button class="btn-primary" type="submit" style="width:100%">Ingresar</button>
+      <div class="msg error" id="loginMsg"></div>
+    </form>
+  </div>
+
+  <div id="panelView">
+    <div class="top-bar">
+      <strong id="welcomeMsg"></strong>
+      <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
+    </div>
+
+    <section class="section">
+      <h2>Alta de producto</h2>
+      <div class="card">
+        <form id="newProductForm">
+          <div class="row">
+            <label class="field">
+              <span>Nombre *</span>
+              <input type="text" id="newName" required>
+            </label>
+            <label class="field">
+              <span>Categoría *</span>
+              <input type="text" id="newCategory" required>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Precio minorista *</span>
+              <input type="number" id="newUnitPrice" min="0" required>
+            </label>
+            <label class="field">
+              <span>Precio mayorista *</span>
+              <input type="number" id="newBulkPrice" min="0" required>
+            </label>
+            <label class="field">
+              <span>Mínimo mayorista</span>
+              <input type="number" id="newBulkQty" min="1" value="10">
+            </label>
+          </div>
+          <button class="btn-primary" type="submit">Crear producto</button>
+          <div class="msg" id="newProductMsg"></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Productos existentes</h2>
+      <div class="msg" id="productsMsg"></div>
+      <div class="product-list" id="productList"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('liderlib_admin_token') || null;
+
+const loginView = document.getElementById('loginView');
+const panelView = document.getElementById('panelView');
+const loginForm = document.getElementById('loginForm');
+const loginMsg = document.getElementById('loginMsg');
+const welcomeMsg = document.getElementById('welcomeMsg');
+
+function showPanel(username) {
+  loginView.style.display = 'none';
+  panelView.style.display = 'block';
+  welcomeMsg.textContent = `Conectado como ${username}`;
+  loadProducts();
+}
+
+function showLogin() {
+  loginView.style.display = 'block';
+  panelView.style.display = 'none';
+}
+
+async function authFetch(url, options = {}) {
+  const headers = Object.assign({}, options.headers, { Authorization: `Bearer ${token}` });
+  const res = await fetch(url, Object.assign({}, options, { headers }));
+  if (res.status === 401) {
+    token = null;
+    localStorage.removeItem('liderlib_admin_token');
+    showLogin();
+    throw new Error('Sesión expirada');
+  }
+  return res;
+}
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginMsg.textContent = '';
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  try {
+    const res = await fetch(`${API}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: username, clave: password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al iniciar sesión');
+    token = data.token;
+    localStorage.setItem('liderlib_admin_token', token);
+    localStorage.setItem('liderlib_admin_user', username);
+    showPanel(username);
+  } catch (err) {
+    loginMsg.textContent = err.message;
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  token = null;
+  localStorage.removeItem('liderlib_admin_token');
+  localStorage.removeItem('liderlib_admin_user');
+  showLogin();
+});
+
+document.getElementById('newProductForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('newProductMsg');
+  msg.className = 'msg';
+  msg.textContent = '';
+  const body = {
+    nombre: document.getElementById('newName').value.trim(),
+    categoria: document.getElementById('newCategory').value.trim(),
+    precio_minorista: document.getElementById('newUnitPrice').value,
+    precio_mayorista: document.getElementById('newBulkPrice').value,
+    cantidad_minima_mayorista: document.getElementById('newBulkQty').value
+  };
+  try {
+    const res = await authFetch('/api/admin/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo crear el producto');
+    msg.classList.add('ok');
+    msg.textContent = `Producto #${data.id} creado.`;
+    e.target.reset();
+    document.getElementById('newBulkQty').value = 10;
+    loadProducts();
+  } catch (err) {
+    msg.classList.add('error');
+    msg.textContent = err.message;
+  }
+});
+
+async function loadProducts() {
+  const list = document.getElementById('productList');
+  const msg = document.getElementById('productsMsg');
+  msg.textContent = 'Cargando...';
+  msg.className = 'msg';
+  try {
+    const res = await fetch('/api/products');
+    const products = await res.json();
+    msg.textContent = '';
+    list.innerHTML = products.map(renderProductRow).join('');
+    products.forEach(bindImageForm);
+  } catch (err) {
+    msg.classList.add('error');
+    msg.textContent = 'No se pudieron cargar los productos.';
+  }
+}
+
+function renderProductRow(p) {
+  const thumb = p.ruta_imagen
+    ? `<img src="${p.ruta_imagen}" alt="${p.nombre}">`
+    : 'Sin imagen';
+  return `
+    <div class="product-row" data-id="${p.id}">
+      <div class="product-thumb">${thumb}</div>
+      <div class="product-info">
+        <b>#${p.id} · ${p.nombre}</b>
+        <span>${p.categoria} · Minorista $${p.precio_minorista} · Mayorista $${p.precio_mayorista}</span>
+      </div>
+      <form class="product-actions image-form" data-id="${p.id}">
+        <input type="file" name="imagen" accept="image/png,image/jpeg,image/webp,image/gif" required>
+        <button class="btn-primary" type="submit">Actualizar imagen</button>
+      </form>
+    </div>
+    <div class="msg" data-image-msg="${p.id}"></div>
+  `;
+}
+
+function bindImageForm(p) {
+  const form = document.querySelector(`.image-form[data-id="${p.id}"]`);
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.querySelector(`[data-image-msg="${p.id}"]`);
+    msg.className = 'msg';
+    const fileInput = form.querySelector('input[type=file]');
+    if (!fileInput.files[0]) return;
+    const formData = new FormData();
+    formData.append('imagen', fileInput.files[0]);
+    try {
+      const res = await authFetch(`/api/admin/products/${p.id}/imagen`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo actualizar la imagen');
+      msg.classList.add('ok');
+      msg.textContent = 'Imagen actualizada.';
+      loadProducts();
+    } catch (err) {
+      msg.classList.add('error');
+      msg.textContent = err.message;
+    }
+  });
+}
+
+if (token) {
+  showPanel(localStorage.getItem('liderlib_admin_user') || 'admin');
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>
